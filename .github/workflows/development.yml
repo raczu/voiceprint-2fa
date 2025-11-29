@@ -1,0 +1,45 @@
+name: development
+on: [push, pull_request]
+
+jobs:
+  maintenance-backend:
+    name: "maintenance (backend)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version-file: ".python-version"
+
+      - name: install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: install dev dependencies
+        run: uv sync --locked --only-dev
+
+      - name: run ruff
+        run: uv run --only-dev ruff check --output-format github .
+
+  maintenance-frontend:
+    name: "maintenance (frontend)"
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v6
+        with:
+            node-version-file: ".nvmrc"
+            cache: "yarn"
+
+      - name: install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: run eslint
+        run: yarn lint
