@@ -1,0 +1,25 @@
+services:
+  pgvector:
+    image: docker.io/pgvector/pgvector:pg18-trixie
+    networks:
+      - voiceprint-app-network
+    volumes:
+      - pgvector-data:/var/lib/postgresql/18/docker
+      - ./backend/scripts/enable-vector.sh:/docker-entrypoint-initdb.d/99-enable-vector.sh
+    ports:
+        - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    env_file:
+      - ".env"
+
+volumes:
+  pgvector-data:
+
+networks:
+    voiceprint-app-network:
+      name: voiceprint-app-network
+      driver: bridge

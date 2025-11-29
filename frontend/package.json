@@ -1,5 +1,5 @@
 {
-  "name": "voiceprint-2fa",
+  "name": "voiceprint-app",
   "private": true,
   "version": "0.0.0",
   "description": "Voiceprint-based two-factor authentication system.",
