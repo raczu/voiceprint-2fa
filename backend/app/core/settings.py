@@ -1,3 +1,5 @@
+from typing import Literal
+
 from pydantic import AnyUrl, PostgresDsn, ValidationInfo, field_validator
 from pydantic_settings import BaseSettings
 
@@ -5,6 +7,13 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     API_PATH: str = "/api/v1"
     BACKEND_CORS_ORIGINS: list[AnyUrl] | str = []
+    ENVIRONMENT: Literal["development", "production"] = "development"
+
+    RECOGNIZER_MODEL_PATH: str = "speechbrain/spkrec-ecapa-voxceleb"
+    MIN_NUMBER_OF_ENROLLMENT_FILES: int = 3
+    VERIFICATION_THRESHOLD: float = 0.7
+    AMPLITUDE_NORMALIZATION_HANDLER: Literal["peak", "rms"] = "peak"
+    EMBEDDING_AGGREGATION_STRATEGY: Literal["mean", "attention"] = "mean"
 
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str

@@ -3,7 +3,7 @@ import uuid
 
 import numpy as np
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import String
+from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 
@@ -43,4 +43,17 @@ class Phrase(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     content: Mapped[str] = mapped_column(String(2048), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True
+    )
     user: Mapped["User"] = relationship("User", back_populates="phrase")
+
+
+class DummyVoiceprint(Base):
+    """Dummy table for testing purposes only during development."""
+
+    __tablename__: str = "dummy_voiceprints"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
+    voiceprint: Mapped[np.ndarray] = mapped_column(Vector(EMBEDDING_DIM))

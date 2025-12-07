@@ -1,11 +1,24 @@
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { TestRecorder } from "@/pages/test-recoder.tsx";
+import { Home } from "@/pages/home.tsx";
+import { ThemeProvider } from "@/components/theme-provider";
+import { Toaster } from "@/components/ui/sonner";
+
 function App() {
+  const environment = import.meta.env.ENVIRONMENT || import.meta.env.MODE;
   return (
-    <>
-      <div className="flex justify-center items-center h-screen">
-        <h1 className="text-2xl m-6>">Hello, World!</h1>
-      </div>
-    </>
-  )
+    <ThemeProvider defaultTheme="dark" storageKey="vite-ui-theme">
+      <Toaster position="bottom-right" />
+      <Router>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          {environment === "development" && (
+            <Route path="/test-recorder" element={<TestRecorder />} />
+          )}
+        </Routes>
+      </Router>
+    </ThemeProvider>
+  );
 }
 
-export default App
+export default App;
