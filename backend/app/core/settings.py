@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import AnyUrl, PostgresDsn, ValidationInfo, field_validator
+from pydantic import AnyUrl, PostgresDsn, ValidationInfo, field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -9,7 +9,9 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[AnyUrl] | str = []
     ENVIRONMENT: Literal["development", "production"] = "development"
 
-    RECOGNIZER_MODEL_PATH: str = "speechbrain/spkrec-ecapa-voxceleb"
+    RECOGNIZER_MODEL: Literal["xvect", "ecapa"] = "xvect"
+    # Default embedding dimension is for ECAPA model; it will be adjusted automatically for x-vector.
+    EMBEDDING_DIMENSION: int = 192
     MIN_NUMBER_OF_ENROLLMENT_FILES: int = 3
     VERIFICATION_THRESHOLD: float = 0.7
     AMPLITUDE_NORMALIZATION_HANDLER: Literal["peak", "rms"] = "peak"
@@ -28,6 +30,12 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return [url.strip() for url in v.split(",")]
         return v
+
+    @model_validator(mode="after")
+    def ensure_proper_embedding_dimension(self) -> "Settings":
+        dims = {"xvect": 512, "ecapa": 192}
+        self.EMBEDDING_DIMENSION = dims[self.RECOGNIZER_MODEL]
+        return self
 
     @field_validator("POSTGRES_DSN", mode="before")
     @classmethod

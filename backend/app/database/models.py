@@ -7,7 +7,8 @@ from sqlalchemy import ForeignKey, String
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship, validates
 
-EMBEDDING_DIM = 192
+from app.core import settings
+
 EMAIL_RE = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,6}$")
 USERNAME_RE = re.compile(r"^\w{4,}$")
 
@@ -22,7 +23,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(255), index=True, unique=True, nullable=False)
     username: Mapped[str] = mapped_column(String(50), nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
-    voiceprint: Mapped[np.ndarray] = mapped_column(Vector(EMBEDDING_DIM))
+    voiceprint: Mapped[np.ndarray] = mapped_column(Vector(settings.EMBEDDING_DIMENSION))
     phrase: Mapped["Phrase"] = relationship("Phrase", back_populates="user", uselist=False)
 
     @validates("email")
@@ -56,4 +57,4 @@ class DummyVoiceprint(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)
-    voiceprint: Mapped[np.ndarray] = mapped_column(Vector(EMBEDDING_DIM))
+    voiceprint: Mapped[np.ndarray] = mapped_column(Vector(settings.EMBEDDING_DIMENSION))

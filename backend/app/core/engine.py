@@ -5,8 +5,8 @@ import torch.nn.functional
 from speechbrain.inference.speaker import SpeakerRecognition
 
 from app.core.audio import (
-    ECAPACompatHandler,
     MeanAggregator,
+    ModelCompatHandler,
     PeakNormalizationHandler,
     RMSNormalizationHandler,
     SimpleSelfAttentionAggregator,
@@ -22,17 +22,17 @@ class VoiceprintEngine:
         recognizer.to(device=device)
         self._recognizer = recognizer
 
-        ecapa = ECAPACompatHandler()
-        ecapa.next(
+        handler = ModelCompatHandler()
+        handler.next(
             PeakNormalizationHandler()
             if settings.AMPLITUDE_NORMALIZATION_HANDLER == "peak"
             else RMSNormalizationHandler()
         )
-        self._preprocessing_pipeline = ecapa
+        self._preprocessing_pipeline = handler
         self._aggregator = (
             MeanAggregator()
             if settings.EMBEDDING_AGGREGATION_STRATEGY == "mean"
-            else SimpleSelfAttentionAggregator(dim=192)
+            else SimpleSelfAttentionAggregator(dim=settings.EMBEDDING_DIMENSION)
         )
 
     @property

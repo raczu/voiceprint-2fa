@@ -18,7 +18,8 @@ logging.config.dictConfig(LOGGING_CONFIG)
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     device: Literal["cpu", "cuda"] = "cuda" if torch.cuda.is_available() else "cpu"
     recognizer = SpeakerRecognition.from_hparams(
-        source=settings.RECOGNIZER_MODEL_PATH, run_opts={"device": device}
+        source=f"speechbrain/spkrec-{settings.RECOGNIZER_MODEL}-voxceleb",
+        run_opts={"device": device},
     )
     vpengine = VoiceprintEngine(recognizer=recognizer, device=device)
     app.state.vpengine = vpengine  # type: ignore[attr-defined]

@@ -65,9 +65,9 @@ class AudioHandler(ABC):
         return waveform, sr
 
 
-class ECAPACompatHandler(AudioHandler):
+class ModelCompatHandler(AudioHandler):
     """
-    Guarantees that the audio waveform is compatible with ECAPA-TDNN model requirements.
+    Guarantees that the audio waveform is compatible with ECAPA-TDNN or x-vector model requirements.
 
     Resamples the audio to 16 kHz and converts it to mono if necessary.
     """
