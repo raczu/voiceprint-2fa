@@ -36,13 +36,14 @@ def main() -> None:
 
     waveform, sr = torchaudio.load(args.input)
     pipeline = ModelCompatHandler()
-    normalizer = pipeline.next(
+    tail = pipeline
+    if settings.VAD_ENABLED:
+        tail = tail.next(VADHandler())
+    tail.next(
         PeakNormalizationHandler()
         if settings.AMPLITUDE_NORMALIZATION_HANDLER == "peak"
         else RMSNormalizationHandler()
     )
-    if settings.VAD_ENABLED:
-        normalizer.next(VADHandler())
     logger.info("Processing audio file: %s", args.input)
     waveform, sr = pipeline.handle(waveform, sr)
     torchaudio.save(args.output, waveform, sr)

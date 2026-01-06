@@ -24,13 +24,14 @@ class VoiceprintEngine:
         self._recognizer = recognizer
 
         pipeline = ModelCompatHandler()
-        normalizer = pipeline.next(
+        tail = pipeline
+        if settings.VAD_ENABLED:
+            tail = tail.next(VADHandler())
+        tail.next(
             PeakNormalizationHandler()
             if settings.AMPLITUDE_NORMALIZATION_HANDLER == "peak"
             else RMSNormalizationHandler()
         )
-        if settings.VAD_ENABLED:
-            normalizer.next(VADHandler())
         self._preprocessing_pipeline = pipeline
         self._aggregator = (
             MeanAggregator()
