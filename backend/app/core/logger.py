@@ -11,10 +11,10 @@ LOGGING_CONFIG = {
     "handlers": {
         "stdout": {
             "class": "logging.StreamHandler",
-            "level": "INFO",
+            "level": "DEBUG",
             "formatter": "simple",
             "stream": "ext://sys.stdout",
         },
     },
-    "loggers": {"root": {"level": "INFO", "handlers": ["stdout"]}},
+    "loggers": {"root": {"level": "DEBUG", "handlers": ["stdout"]}},
 }

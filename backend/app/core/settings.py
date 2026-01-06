@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     VERIFICATION_THRESHOLD: float = 0.7
     AMPLITUDE_NORMALIZATION_HANDLER: Literal["peak", "rms"] = "peak"
     EMBEDDING_AGGREGATION_STRATEGY: Literal["mean", "attention"] = "mean"
+    VAD_ENABLED: bool = True
 
     POSTGRES_USER: str
     POSTGRES_PASSWORD: str

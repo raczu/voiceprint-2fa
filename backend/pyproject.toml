@@ -15,6 +15,7 @@ dependencies = [
     "soundfile>=0.13.1 ; sys_platform == 'darwin'",
     "speechbrain>=1.0.3",
     "sqlalchemy[asyncio]>=2.0.44",
+    "webrtcvad>=2.0.10",
 ]
 
 [tool.uv]

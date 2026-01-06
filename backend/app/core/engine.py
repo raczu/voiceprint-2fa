@@ -10,6 +10,7 @@ from app.core.audio import (
     PeakNormalizationHandler,
     RMSNormalizationHandler,
     SimpleSelfAttentionAggregator,
+    VADHandler,
 )
 from app.core.settings import settings
 
@@ -22,13 +23,15 @@ class VoiceprintEngine:
         recognizer.to(device=device)
         self._recognizer = recognizer
 
-        handler = ModelCompatHandler()
-        handler.next(
+        pipeline = ModelCompatHandler()
+        normalizer = pipeline.next(
             PeakNormalizationHandler()
             if settings.AMPLITUDE_NORMALIZATION_HANDLER == "peak"
             else RMSNormalizationHandler()
         )
-        self._preprocessing_pipeline = handler
+        if settings.VAD_ENABLED:
+            normalizer.next(VADHandler())
+        self._preprocessing_pipeline = pipeline
         self._aggregator = (
             MeanAggregator()
             if settings.EMBEDDING_AGGREGATION_STRATEGY == "mean"
