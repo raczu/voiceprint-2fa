@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/card";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +21,7 @@ import {
   FieldLabel,
   FieldLegend,
   FieldSet,
+  FieldSeparator,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -152,6 +153,43 @@ export const TestRecorder = () => {
     );
   }, []);
 
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const handleFilesUpload = useCallback((files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const arr = Array.from(files);
+    const wavs = arr.filter((f) => {
+      const name = f.name.toLowerCase();
+      const isWav = name.endsWith(".wav") || f.type === "audio/wav";
+      if (!isWav) toast.error(`${f.name}: tylko format .wav jest obsługiwany`);
+      return isWav;
+    });
+
+    wavs.forEach((f) => {
+      const id = crypto.randomUUID();
+      const url = URL.createObjectURL(f);
+      const newRec: Recording = {
+        id,
+        filename: f.name,
+        blob: f,
+        url,
+        size: f.size,
+        duration: undefined,
+      };
+      setRecordings((prev) => [newRec, ...prev]);
+
+      const audio = new Audio(url);
+      audio.addEventListener(
+        "loadedmetadata",
+        () => {
+          setRecordings((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, duration: audio.duration } : r)),
+          );
+        },
+        { once: true },
+      );
+    });
+  }, []);
+
   const playRecording = useCallback((rec: Recording) => new Audio(rec.url).play(), []);
   const deleteRecording = useCallback((id: string) => {
     setRecordings((prev) => {
@@ -251,6 +289,33 @@ export const TestRecorder = () => {
                   <FieldDescription>
                     Nagraj swój głos, a następnie odtwórz lub usuń nagrania według potrzeb.
                   </FieldDescription>
+                </div>
+
+                <FieldSeparator className="*:data-[slot=field-separator-content]:bg-card">
+                  lub wykorzystaj gotowe nagrania
+                </FieldSeparator>
+
+                <div className="space-y-3">
+                  <Input
+                    ref={fileInputRef}
+                    id="upload"
+                    type="file"
+                    multiple
+                    accept="audio/wav, .wav"
+                    className="hidden"
+                    onChange={(e) => handleFilesUpload(e.target.files)}
+                  />
+
+                  <div className="flex justify-center">
+                    <Button
+                      className="w-full max-w-sm"
+                      variant="outline"
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                    >
+                      Prześlij pliki
+                    </Button>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
