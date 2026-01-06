@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { Trash2, Play } from "lucide-react";
+import { Trash2, Play, ArrowDownToLine } from "lucide-react";
 import { formatSecs, formatBytes } from "@/lib/utils";
 import type { Recording } from "@/types/recording";
 
@@ -7,9 +7,15 @@ type RecordingsListProps = {
   recordings: Recording[];
   onPlay: (r: Recording) => void;
   onDelete: (id: string) => void;
+  onDownload?: (r: Recording) => void;
 };
 
-export const RecordingsList: React.FC<RecordingsListProps> = ({ recordings, onPlay, onDelete }) => {
+export const RecordingsList: React.FC<RecordingsListProps> = ({
+  recordings,
+  onPlay,
+  onDelete,
+  onDownload,
+}) => {
   if (recordings.length === 0) return null;
 
   return (
@@ -27,8 +33,7 @@ export const RecordingsList: React.FC<RecordingsListProps> = ({ recordings, onPl
             <div className="min-w-0">
               <p className="font-medium truncate">{rec.filename}</p>
               <p className="text-xs text-muted-foreground">
-                {formatSecs(rec.duration)} &bull;
-                {formatBytes(rec.size)}
+                {formatSecs(rec.duration)} &bull; {formatBytes(rec.size)}
               </p>
             </div>
           </div>
@@ -44,6 +49,20 @@ export const RecordingsList: React.FC<RecordingsListProps> = ({ recordings, onPl
             >
               <Play className="h-3.5 w-3.5" />
             </Button>
+
+            {onDownload && (
+              <Button
+                size="icon"
+                variant="ghost"
+                type="button"
+                className="h-8 w-8"
+                onClick={() => onDownload(rec)}
+                aria-label={`Pobierz ${idx + 1}`}
+              >
+                <ArrowDownToLine className="h-3.5 w-3.5" />
+              </Button>
+            )}
+
             <Button
               size="icon"
               variant="ghost"

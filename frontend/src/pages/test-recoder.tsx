@@ -13,7 +13,15 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { RecordingsList } from "@/components/recordings-list";
@@ -21,7 +29,9 @@ import { toast } from "sonner";
 import type { Recording } from "@/types/recording";
 import api from "@/lib/api";
 
-const PHRASE = "Jeśli masz wybierać między jednym złem a drugim, lepiej nie wybierać wcale.";
+const SHORT_PHRASE = "Zło to zło.";
+const LONG_PHRASE =
+  "Błędy też się dla mnie liczą. Nie wykreślam ich ani z życia, ani z pamięci. I nigdy nie winię za nie innych.";
 const MIN_RECORDINGS = 3;
 
 const schema = z.object({
@@ -68,7 +78,7 @@ export const TestRecorder = () => {
     try {
       const res = await api.post(`/api/v1/private/enroll/${username}`, fd, {
         transformRequest: (data) => data,
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { "Content-Type": "multipart/form-data" },
       });
       console.log(`[ENROLL] ${res.status}`);
       if (res.status === 201) {
@@ -98,7 +108,7 @@ export const TestRecorder = () => {
     try {
       const res = await api.post(`/api/v1/private/verify/${username}`, fd, {
         transformRequest: (data) => data,
-        headers: { 'Content-Type': 'multipart/form-data' },
+        headers: { "Content-Type": "multipart/form-data" },
       });
       console.log(`[VERIFY] ${res.status}`);
       if (res.status === 200) {
@@ -151,6 +161,21 @@ export const TestRecorder = () => {
     });
   }, []);
 
+  const downloadRecording = useCallback((rec: Recording) => {
+    try {
+      const url = rec.url ?? URL.createObjectURL(rec.blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = rec.filename;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      if (!rec.url) URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("download failed", err);
+    }
+  }, []);
+
   useEffect(() => {
     return () => recordings.forEach((r) => URL.revokeObjectURL(r.url));
   }, []);
@@ -180,20 +205,42 @@ export const TestRecorder = () => {
                   {errors.username && <FieldError>{errors.username.message}</FieldError>}
                 </Field>
 
-                <Field>
-                  <FieldLabel htmlFor="phrase">Fraza do nagrania</FieldLabel>
-                  <Textarea
-                    id="phrase"
-                    value={PHRASE}
-                    readOnly
-                    rows={3}
-                    className="cursor-default resize-none"
-                    aria-describedby="phrase-description"
-                  />
-                  <FieldDescription id="phrase-description">
-                    Wypowiedzenie tej frazy powinno zająć minimum 3 sekundy.
+                <FieldSet>
+                  <FieldLegend>Frazy do nagrania</FieldLegend>
+                  <FieldDescription>
+                    W celu utworzenia próbki głosu lub jej weryfikacji wybierz jedną z poniższych
+                    fraz do nagrania.
                   </FieldDescription>
-                </Field>
+                  <Field>
+                    <FieldLabel htmlFor="short-phrase">Krótka fraza do nagrania</FieldLabel>
+                    <Textarea
+                      id="short-phrase"
+                      value={SHORT_PHRASE}
+                      readOnly
+                      rows={1}
+                      className="cursor-default resize-none"
+                      aria-describedby="short-phrase-description"
+                    />
+                    <FieldDescription id="short-phrase-description">
+                      Wypowiedzenie tej frazy powinno zająć od 1-2 sekund.
+                    </FieldDescription>
+                  </Field>
+
+                  <Field>
+                    <FieldLabel htmlFor="long-phrase">Długa fraza do nagrania</FieldLabel>
+                    <Textarea
+                      id="long-phrase"
+                      value={LONG_PHRASE}
+                      readOnly
+                      rows={3}
+                      className="cursor-default resize-none"
+                      aria-describedby="long-phrase-description"
+                    />
+                    <FieldDescription id="long-phrase-description">
+                      Wypowiedzenie tej frazy powinno zająć od 5-10 sekund.
+                    </FieldDescription>
+                  </Field>
+                </FieldSet>
 
                 <div className="space-y-3">
                   <FieldLabel htmlFor="recorder">Rejestrator</FieldLabel>
@@ -212,6 +259,7 @@ export const TestRecorder = () => {
                     recordings={recordings}
                     onPlay={playRecording}
                     onDelete={deleteRecording}
+                    onDownload={downloadRecording}
                   />
                   <FieldDescription>
                     Utworzenie próbki głosu wymaga co najmniej trzech nagrań.
