@@ -13,7 +13,7 @@ from app.core import (
 from app.core.settings import settings
 
 logging.basicConfig(
-    level=logging.INFO,
+    level=logging.DEBUG,
     format="[%(asctime)s] %(levelname)s: %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )

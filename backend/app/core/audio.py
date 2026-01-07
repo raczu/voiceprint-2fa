@@ -137,7 +137,7 @@ class VADHandler(AudioHandler):
     # * 1: low bitrate mode.
     # * 2: aggressive mode (recommended for voice authentication).
     # * 3: most aggressive, least permissive.
-    _AGRESSIVENESS: int = 2
+    _AGRESSIVENESS: int = 3
     # Use 10, 20, or 30 ms frame durations (required by webrtcvad).
     _FRAME_DURATION_MS: int = 30
     _SILENCE_PADDING_MS: int = 300

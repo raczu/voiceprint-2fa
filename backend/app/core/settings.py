@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     BACKEND_CORS_ORIGINS: list[AnyUrl] | str = []
     ENVIRONMENT: Literal["development", "production"] = "development"
 
-    RECOGNIZER_MODEL: Literal["xvect", "ecapa"] = "xvect"
+    RECOGNIZER_MODEL: Literal["xvect", "ecapa"] = "ecapa"
     # Default embedding dimension is for ECAPA model; it will be adjusted automatically for x-vector.
     EMBEDDING_DIMENSION: int = 192
     MIN_NUMBER_OF_ENROLLMENT_FILES: int = 3
