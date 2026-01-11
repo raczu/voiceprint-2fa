@@ -136,4 +136,7 @@ fabric.properties
 .history
 .ionide
 
+# Project specific files
+recordings/
+
 # End of https://www.toptal.com/developers/gitignore/api/pycharm,visualstudiocode,dotenv

@@ -1,15 +1,18 @@
 import asyncio
 import logging
+from typing import Any
 
 import numpy as np
 import torch
 import torchaudio
 from fastapi import APIRouter, HTTPException, Response, UploadFile, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 
 from app.api.deps import SessionDep, VPEngineDep
 from app.core import settings
 from app.database import DummyVoiceprint
+from app.schemas import VerifyResponse
 
 router = APIRouter(prefix="/private", tags=["private"])
 logger = logging.getLogger(__name__)
@@ -50,10 +53,17 @@ async def enroll(
     return Response(status_code=status.HTTP_201_CREATED)
 
 
-@router.post("/verify/{username}", summary="Verify a user's test voiceprint")
+@router.post(
+    "/verify/{username}",
+    summary="Verify a user's test voiceprint",
+    response_model=VerifyResponse,
+    responses={
+        status.HTTP_401_UNAUTHORIZED: {"model": VerifyResponse},
+    },
+)
 async def verify(
     username: str, file: UploadFile, *, session: SessionDep, vpengine: VPEngineDep
-) -> Response:
+) -> Any:
     result = await session.execute(
         select(DummyVoiceprint).where(DummyVoiceprint.username == username)
     )
@@ -69,10 +79,10 @@ async def verify(
     reference = torch.from_numpy(voiceprint.voiceprint).to(device=vpengine.device)
     success, score = vpengine.verify(embedding, reference)
     logger.info("Voiceprint verification score for user '%s': %.4f", username, score)
+
+    response = VerifyResponse(
+        success=success, score=score, threshold=settings.VERIFICATION_THRESHOLD
+    )
     if not success:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Voiceprint verification failed with score {score:.4f} "
-            f"(threshold {settings.VERIFICATION_THRESHOLD})",
-        )
-    return Response(status_code=status.HTTP_200_OK)
+        return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content=response.model_dump())
+    return response
