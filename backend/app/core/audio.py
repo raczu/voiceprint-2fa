@@ -1,6 +1,6 @@
 import logging
 from abc import ABC, abstractmethod
-from typing import Self, override
+from typing import Literal, Self, override
 
 import numpy as np
 import torch
@@ -35,14 +35,14 @@ class SimpleSelfAttentionAggregator(EmbeddingAggregator):
 
     _ATTENTION_DIM: int = 128
 
-    def __init__(self, dim: int) -> None:
+    def __init__(self, dim: int, device: Literal["cpu", "cuda"] = "cpu") -> None:
         super().__init__()
         self._attention = torch.nn.Sequential(
             torch.nn.Linear(dim, self._ATTENTION_DIM),
             torch.nn.Tanh(),
             torch.nn.Linear(self._ATTENTION_DIM, 1),
             torch.nn.Softmax(dim=0),
-        )
+        ).to(device)
 
     @override
     def aggregate(self, embeddings: list[torch.Tensor]) -> torch.Tensor:

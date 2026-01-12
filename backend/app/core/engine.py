@@ -36,7 +36,7 @@ class VoiceprintEngine:
         self._aggregator = (
             MeanAggregator()
             if settings.EMBEDDING_AGGREGATION_STRATEGY == "mean"
-            else SimpleSelfAttentionAggregator(dim=settings.EMBEDDING_DIMENSION)
+            else SimpleSelfAttentionAggregator(dim=settings.EMBEDDING_DIMENSION, device=device)
         )
 
     @property
