@@ -1,6 +1,14 @@
+import secrets
 from typing import Literal
 
-from pydantic import AnyUrl, PostgresDsn, ValidationInfo, field_validator, model_validator
+from pydantic import (
+    AnyUrl,
+    PostgresDsn,
+    SecretStr,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import BaseSettings
 
 
@@ -8,6 +16,12 @@ class Settings(BaseSettings):
     API_PATH: str = "/api/v1"
     BACKEND_CORS_ORIGINS: list[AnyUrl] | str = []
     ENVIRONMENT: Literal["development", "production"] = "development"
+
+    JWT_ALGORITHM: Literal["HS256", "RS256"] = "HS256"
+    JWT_SECRET_KEY: SecretStr = SecretStr(secrets.token_urlsafe(32))
+    PRE_AUTH_TOKEN_EXPIRE_MINUTES: int = 5
+    ENROLLMENT_TOKEN_EXPIRE_MINUTES: int = 15
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
 
     RECOGNIZER_MODEL: Literal["xvect", "ecapa"] = "ecapa"
     # Default embedding dimension is for ECAPA model; it will be adjusted automatically for x-vector.

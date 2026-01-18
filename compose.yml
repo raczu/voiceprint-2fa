@@ -16,6 +16,19 @@ services:
     env_file:
       - ".env"
 
+  backend:
+    build:
+      context: ./backend
+    networks:
+      - voiceprint-app-network
+    ports:
+      - "${VOICEPRINT_APP_BACKEND_PORT:-8000}:8000"
+    depends_on:
+      pgvector:
+        condition: service_healthy
+    env_file:
+      - ".env"
+
 volumes:
   pgvector-data:
 

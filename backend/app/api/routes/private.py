@@ -35,7 +35,7 @@ async def enroll(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Voiceprint for this user already exists",
         )
-    if len(files) < settings.MIN_NUMBER_OF_ENROLLMENT_FILES:
+    if len(files) < settings.MIN_NUMBER_OF_ENROLLMENT_FILES:  # noqa
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"At least {settings.MIN_NUMBER_OF_ENROLLMENT_FILES} enrollment files are required",

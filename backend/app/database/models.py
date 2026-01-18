@@ -17,14 +17,21 @@ class Base(DeclarativeBase): ...
 
 
 class User(Base):
-    __tablename__: str = "users"
+    __tablename__: str = "user"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(100), nullable=False)
+    surname: Mapped[str] = mapped_column(String(100), nullable=False)
     email: Mapped[str] = mapped_column(String(255), index=True, unique=True, nullable=False)
     username: Mapped[str] = mapped_column(String(50), nullable=False)
     password: Mapped[str] = mapped_column(String(255), nullable=False)
-    voiceprint: Mapped[np.ndarray] = mapped_column(Vector(settings.EMBEDDING_DIMENSION))
-    phrase: Mapped["Phrase"] = relationship("Phrase", back_populates="user", uselist=False)
+    is_enrollment_complete: Mapped[bool] = mapped_column(nullable=False, default=False)
+    voiceprint: Mapped[np.ndarray | None] = mapped_column(
+        Vector(settings.EMBEDDING_DIMENSION), nullable=True
+    )
+    phrase_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("phrase.id"), nullable=True)
+
+    phrase: Mapped["Phrase"] = relationship("Phrase")
 
     @validates("email")
     def _validate_email(self, key: str, address: str) -> str:
@@ -40,20 +47,16 @@ class User(Base):
 
 
 class Phrase(Base):
-    __tablename__: str = "phrases"
+    __tablename__: str = "phrase"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    content: Mapped[str] = mapped_column(String(2048), nullable=False)
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False, unique=True
-    )
-    user: Mapped["User"] = relationship("User", back_populates="phrase")
+    content: Mapped[str] = mapped_column(String(2048), nullable=False, unique=True)
 
 
 class DummyVoiceprint(Base):
     """Dummy table for testing purposes only during development."""
 
-    __tablename__: str = "dummy_voiceprints"
+    __tablename__: str = "dummy_voiceprint"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     username: Mapped[str] = mapped_column(String(50), nullable=False, unique=True)

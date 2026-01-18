@@ -6,6 +6,7 @@ from app.core.audio import (
 )
 from app.core.engine import VoiceprintEngine
 from app.core.logger import LOGGING_CONFIG
+from app.core.security import create_token, get_password_hash, verify_password
 from app.core.settings import settings
 
 __all__ = [
@@ -16,4 +17,7 @@ __all__ = [
     "PeakNormalizationHandler",
     "RMSNormalizationHandler",
     "VADHandler",
+    "create_token",
+    "get_password_hash",
+    "verify_password",
 ]
