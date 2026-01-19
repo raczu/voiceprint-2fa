@@ -52,7 +52,9 @@ TokenDep = Annotated[str, Depends(REUSABLE_OAUTH2)]
 
 def parse_jwt_token(token: TokenDep) -> TokenPayload:
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY.get_secret_value(), algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(
+            token, settings.JWT_SECRET_KEY.get_secret_value(), algorithms=[settings.JWT_ALGORITHM]
+        )
         data = TokenPayload(**payload)
     except (JWTError, ValidationError) as exc:
         raise HTTPException(
@@ -84,4 +86,6 @@ async def get_current_user(
 
 CurrentUserDep = Annotated[User, Security(get_current_user, scopes=["auth:full"])]
 Current2FAUserDep = Annotated[User, Security(get_current_user, scopes=["2fa:required"])]
-CurrentEnrollmentUserDep = Annotated[User, Security(get_current_user, scopes=["onboarding:required"])]
+CurrentEnrollmentUserDep = Annotated[
+    User, Security(get_current_user, scopes=["onboarding:required"])
+]
