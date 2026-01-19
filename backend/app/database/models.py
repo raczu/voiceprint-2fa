@@ -31,7 +31,7 @@ class User(Base):
     )
     phrase_id: Mapped[uuid.UUID | None] = mapped_column(ForeignKey("phrase.id"), nullable=True)
 
-    phrase: Mapped["Phrase"] = relationship("Phrase")
+    phrase: Mapped["Phrase"] = relationship("Phrase", lazy="joined")
 
     @validates("email")
     def _validate_email(self, key: str, address: str) -> str:

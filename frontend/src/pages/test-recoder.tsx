@@ -234,7 +234,7 @@ export const TestRecorder = () => {
           </CardHeader>
 
           <CardContent>
-            <form>
+            <form onSubmit={(e) => e.preventDefault()}>
               <FieldGroup>
                 <Field data-invalid={!!errors.username}>
                   <FieldLabel htmlFor="username">Nazwa użytkownika</FieldLabel>
@@ -336,14 +336,14 @@ export const TestRecorder = () => {
           <CardFooter>
             <Field orientation="horizontal">
               <Button
-                type="submit"
+                type="button"
                 disabled={!username || !hasEnoughRecordings || isSubmitting}
                 onClick={onEnroll}
               >
                 Uwtórz
               </Button>
               <Button
-                type="submit"
+                type="button"
                 variant="outline"
                 disabled={recordings.length === 0 || isSubmitting || !username}
                 onClick={onVerify}

@@ -1,4 +1,5 @@
 import re
+import uuid
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
@@ -51,7 +52,7 @@ class UserCreate(UserBase):
 class UserInDB(UserBase):
     model_config = ConfigDict(from_attributes=True)
 
-    id: str
+    id: uuid.UUID
 
 
 class UserRead(UserInDB): ...

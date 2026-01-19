@@ -1,13 +1,28 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Mic, StopCircle, Save, Play, Pause, Trash2 } from "lucide-react";
-import { MediaRecorder, register } from "extendable-media-recorder";
+import { Mic, Square, Save, Play, Pause, Trash2, Loader2 } from "lucide-react";
+import { MediaRecorder as ExtendableRecorder, register } from "extendable-media-recorder";
 import { connect } from "extendable-media-recorder-wav-encoder";
 
-await register(await connect());
+let isEncoderRegistered = false;
+const initEncoder = async () => {
+  if (isEncoderRegistered) return;
+  try {
+    await register(await connect());
+    isEncoderRegistered = true;
+  } catch (e) {
+    console.warn("Encoder init warning:", e);
+  }
+};
 
-type RecorderState = "idle" | "requesting" | "recording" | "paused" | "playing";
+const formatTime = (seconds: number): string => {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+};
+
+const shortUUID = () => Math.random().toString(36).slice(2, 10);
 
 interface AudioRecorderProps {
   onSave: (blob: Blob, filename: string, duration: number) => void;
@@ -17,208 +32,224 @@ interface AudioRecorderProps {
   className?: string;
 }
 
-const formatTime = (seconds: number): string => {
-  const m = Math.floor(seconds / 60);
-  const s = Math.floor(seconds % 60);
-  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
-};
-
-const shortUUID = () => {
-  const uuid =
-    typeof crypto !== "undefined" && crypto.randomUUID
-      ? crypto.randomUUID().split("-")[0]
-      : Math.random().toString(36).slice(2, 10);
-  return uuid;
-};
-
-export const AudioRecorder: React.FC<AudioRecorderProps> = ({
+export const AudioRecorder = ({
   onSave,
   onStart,
   onStop,
   onError,
   className,
-}) => {
-  const [state, setState] = useState<RecorderState>("idle");
-  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
+}: AudioRecorderProps) => {
+  const [isReady, setIsReady] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
 
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [playbackTime, setPlaybackTime] = useState(0);
-  const [duration, setDuration] = useState<number | null>(null);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaRecorderRef = useRef<ExtendableRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  useEffect(() => {
+    initEncoder().then(() => setIsReady(true));
+  }, []);
+
   const startRecording = useCallback(async () => {
+    if (!isReady) return;
     try {
-      setState("requesting");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
 
-      const recorder = new MediaRecorder(stream, { mimeType: "audio/wav" });
+      const recorder = new ExtendableRecorder(stream, { mimeType: "audio/wav" });
+      mediaRecorderRef.current = recorder;
       chunksRef.current = [];
 
-      recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
 
       recorder.onstart = () => {
-        setState("recording");
-        setRecordingTime(0);
+        setIsRecording(true);
+        setCurrentTime(0);
+        setDuration(0);
+
         timerRef.current = setInterval(() => {
-          setRecordingTime((t) => t + 1);
+          setCurrentTime((t) => t + 1);
         }, 1000);
+
         onStart?.();
       };
 
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/wav" });
         const url = URL.createObjectURL(blob);
+        if (timerRef.current) clearInterval(timerRef.current);
+
         setRecordedBlob(blob);
         setAudioUrl(url);
-        setDuration(recordingTime);
-        setState("paused");
+        setDuration((prev) => {
+          return currentTime;
+        });
+
+        setIsRecording(false);
         onStop?.();
+
+        stream.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
       };
 
-      mediaRecorderRef.current = recorder;
       recorder.start();
     } catch (err) {
-      onError(err instanceof Error ? err : new Error("Microphone access denied"));
-      setState("idle");
+      onError(err instanceof Error ? err : new Error("Brak dostępu do mikrofonu"));
     }
-  }, [onStart, onStop, onError, recordingTime]);
+  }, [isReady, onStart, onStop, onError, currentTime]);
 
   const stopRecording = useCallback(() => {
+    setDuration(currentTime);
     mediaRecorderRef.current?.stop();
-    timerRef.current && clearInterval(timerRef.current);
-    timerRef.current = null;
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-  }, []);
+  }, [currentTime]);
+
+  const togglePlayback = useCallback(() => {
+    if (!audioRef.current || !audioUrl) return;
+    if (isPlaying) {
+      audioRef.current.pause();
+    } else {
+      audioRef.current.play();
+    }
+    setIsPlaying(!isPlaying);
+  }, [audioUrl, isPlaying]);
 
   const discard = useCallback(() => {
     if (audioUrl) URL.revokeObjectURL(audioUrl);
     setRecordedBlob(null);
     setAudioUrl(null);
-    setDuration(null);
-    setPlaybackTime(0);
-    setRecordingTime(0);
-    setState("idle");
-    audioRef.current = null;
+    setDuration(0);
+    setCurrentTime(0);
+    setIsPlaying(false);
   }, [audioUrl]);
 
   const saveRecording = useCallback(() => {
     if (!recordedBlob) return;
-    onSave(recordedBlob, `${shortUUID()}.wav`, duration ?? 0);
-  }, [recordedBlob, onSave]);
-
-  const togglePlayback = useCallback(() => {
-    if (!audioRef.current || !audioUrl) return;
-
-    if (audioRef.current.paused) {
-      audioRef.current.play();
-      setState("playing");
-    } else {
-      audioRef.current.pause();
-      setState("paused");
-    }
-  }, [audioUrl]);
+    onSave(recordedBlob, `${shortUUID()}.wav`, duration);
+  }, [recordedBlob, onSave, duration]);
 
   useEffect(() => {
-    if (!audioUrl) return;
-
-    const audio = new Audio(audioUrl);
-    audioRef.current = audio;
-
-    const updateTime = () => setPlaybackTime(Math.floor(audio.currentTime));
-    const onEnded = () => setState("paused");
-    const onLoaded = () => {
-      if (isFinite(audio.duration)) setDuration(Math.floor(audio.duration));
-    };
-
-    audio.addEventListener("timeupdate", updateTime);
-    audio.addEventListener("ended", onEnded);
-    audio.addEventListener("loadedmetadata", onLoaded);
-
     return () => {
-      audio.removeEventListener("timeupdate", updateTime);
-      audio.removeEventListener("ended", onEnded);
-      audio.removeEventListener("loadedmetadata", onLoaded);
-      audio.pause();
-      audio.src = "";
+      if (timerRef.current) clearInterval(timerRef.current);
       if (audioUrl) URL.revokeObjectURL(audioUrl);
-    };
-  }, [audioUrl]);
-
-  useEffect(() => {
-    return () => {
-      timerRef.current && clearInterval(timerRef.current);
       streamRef.current?.getTracks().forEach((t) => t.stop());
-      if (audioUrl) URL.revokeObjectURL(audioUrl);
     };
   }, [audioUrl]);
 
-  const currentTime = state === "recording" ? recordingTime : playbackTime;
-  const isRecording = state === "recording";
+  if (!isReady) {
+    return (
+      <div className="flex h-12 w-full items-center justify-center gap-2 rounded-md border bg-muted/20 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" /> Inicjalizacja...
+      </div>
+    );
+  }
   const hasRecording = !!audioUrl;
-  const isPlaying = state === "playing";
 
   return (
     <div className={cn("flex flex-col items-center gap-3", className)}>
-      <div className="font-mono text-md tabular-nums tracking-wider">
-        <span className={isRecording ? "text-destructive" : ""}>{formatTime(currentTime)}</span>
-        {duration !== null && !isRecording && (
-          <>
-            <span className="mx-3 opacity-50">/</span>
-            <span className="text-md opacity-70">{formatTime(duration)}</span>
-          </>
-        )}
+      <div className="flex items-center gap-2 font-mono text-sm tabular-nums">
+        <span
+          className={cn(
+            "transition-colors duration-300",
+            isRecording ? "text-destructive font-bold animate-pulse" : "text-foreground",
+          )}
+        >
+          {formatTime(currentTime)}
+        </span>
+
+        <span className="text-muted-foreground">/</span>
+
+        <span className="text-muted-foreground">
+          {isRecording ? "--:--" : formatTime(duration)}
+        </span>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2">
         {isRecording ? (
-          <Button size="icon-lg" type="button" variant="destructive" onClick={stopRecording}>
-            <StopCircle />
+          <Button
+            type="button"
+            variant="destructive"
+            size="icon-lg"
+            className="rounded-md"
+            onClick={stopRecording}
+          >
+            <Square className="h-4 w-4 fill-current" />
           </Button>
         ) : (
           <Button
-            size="icon-lg"
             type="button"
+            variant="outline"
+            size="icon-lg"
+            className={cn("rounded-md", isRecording && "bg-red-100 border-red-200")}
             onClick={startRecording}
-            disabled={state === "requesting"}
+            disabled={hasRecording}
           >
-            <Mic />
+            <Mic className="h-4 w-4" />
           </Button>
         )}
 
-        <Button size="icon-lg" type="button" onClick={togglePlayback} disabled={!hasRecording}>
-          {isPlaying ? <Pause /> : <Play />}
-        </Button>
-
         <Button
-          size="icon-lg"
           type="button"
-          variant="destructive"
-          onClick={discard}
-          disabled={isRecording || !hasRecording}
+          variant="outline"
+          size="icon-lg"
+          className="rounded-md"
+          onClick={togglePlayback}
+          disabled={!hasRecording || isRecording}
         >
-          <Trash2 />
+          {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
         </Button>
 
         <Button
-          size="icon-lg"
           type="button"
-          variant="default"
+          variant="outline"
+          size="icon-lg"
+          className="rounded-md hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+          onClick={discard}
+          disabled={!hasRecording || isRecording || isPlaying}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          size="icon-lg"
+          className="rounded-md hover:bg-green-500/10 hover:text-green-600 hover:border-green-600/30"
           onClick={saveRecording}
           disabled={!hasRecording || isRecording}
         >
-          <Save />
+          <Save className="h-4 w-4" />
         </Button>
       </div>
 
-      {audioUrl && <audio src={audioUrl} preload="metadata" />}
+      {audioUrl && (
+        <audio
+          ref={audioRef}
+          src={audioUrl}
+          onTimeUpdate={(e) => setCurrentTime(e.currentTarget.currentTime)}
+          onEnded={() => {
+            setIsPlaying(false);
+            setCurrentTime(0);
+          }}
+          onPause={() => setIsPlaying(false)}
+          onPlay={() => setIsPlaying(true)}
+          onLoadedMetadata={(e) => {
+            if (isFinite(e.currentTarget.duration)) {
+              setDuration(e.currentTarget.duration);
+            }
+          }}
+        />
+      )}
     </div>
   );
 };

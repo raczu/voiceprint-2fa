@@ -16,9 +16,9 @@ from app.schemas import TokenPayload
 REUSABLE_OAUTH2 = OAuth2PasswordBearer(
     tokenUrl=f"{settings.API_PATH}/auth/login",
     scopes={
-        "full_access": "Full API access (standard user)",
-        "2fa_required": "Restricted access (pending voice verification)",
-        "enrollment": "Restricted access (voice enrollment only)",
+        "auth:full": "Full API access (standard user)",
+        "2fa:required": "Restricted access (pending voice verification)",
+        "onboarding:required": "Restricted access (voice enrollment only)",
     },
 )
 
@@ -52,7 +52,7 @@ TokenDep = Annotated[str, Depends(REUSABLE_OAUTH2)]
 
 def parse_jwt_token(token: TokenDep) -> TokenPayload:
     try:
-        payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
+        payload = jwt.decode(token, settings.JWT_SECRET_KEY.get_secret_value(), algorithms=[settings.JWT_ALGORITHM])
         data = TokenPayload(**payload)
     except (JWTError, ValidationError) as exc:
         raise HTTPException(
@@ -82,6 +82,6 @@ async def get_current_user(
     return user
 
 
-CurrentUserDep = Annotated[User, Security(get_current_user, scopes=["full_access"])]
-Current2FAUserDep = Annotated[User, Security(get_current_user, scopes=["2fa_required"])]
-CurrentEnrollmentUserDep = Annotated[User, Security(get_current_user, scopes=["enrollment"])]
+CurrentUserDep = Annotated[User, Security(get_current_user, scopes=["auth:full"])]
+Current2FAUserDep = Annotated[User, Security(get_current_user, scopes=["2fa:required"])]
+CurrentEnrollmentUserDep = Annotated[User, Security(get_current_user, scopes=["onboarding:required"])]

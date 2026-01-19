@@ -1,5 +1,6 @@
 from datetime import timedelta
 from typing import Annotated
+import asyncio
 
 import numpy as np
 import torch
@@ -46,7 +47,7 @@ async def register(user_in: UserCreate, session: SessionDep) -> TokenWithPhrase:
         subject=str(user.id),
         name=f"{user.name} {user.surname}",
         delta=timedelta(minutes=settings.ENROLLMENT_TOKEN_EXPIRE_MINUTES),
-        scopes=["enrollment"],
+        scopes=["onboarding:required"],
     )
     return TokenWithPhrase(
         access_token=token,
@@ -56,7 +57,7 @@ async def register(user_in: UserCreate, session: SessionDep) -> TokenWithPhrase:
 
 
 @router.post(
-    "/register/enroll",
+    "/register/enroll-voice",
     summary="Complete user registration with voice enrollment",
     response_model=Token,
 )
@@ -74,7 +75,7 @@ async def enroll_voice(
 
     embeddings = []
     for file in files:
-        waveform, sr = await torch.to_thread(torchaudio.load, file.file)
+        waveform, sr = await asyncio.to_thread(torchaudio.load, file.file)
         embedding = vpengine.embed(waveform, sr)
         embeddings.append(embedding)
     aggregated = vpengine.aggregate(embeddings)
@@ -85,7 +86,7 @@ async def enroll_voice(
         subject=str(user.id),
         name=f"{user.name} {user.surname}",
         delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
-        scopes=["full_access"],
+        scopes=["auth:full"],
     )
     return Token(access_token=token, expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
 
@@ -115,7 +116,7 @@ async def login(
         subject=str(user.id),
         name=f"{user.name} {user.surname}",
         delta=timedelta(minutes=settings.PRE_AUTH_TOKEN_EXPIRE_MINUTES),
-        scopes=["2fa_required"],
+        scopes=["2fa:required"],
     )
     return TokenWithPhrase(
         access_token=token,
@@ -132,7 +133,7 @@ async def login(
 async def verify_voice(
     file: UploadFile, user: CurrentEnrollmentUserDep, vpengine: VPEngineDep
 ) -> Token:
-    waveform, sr = await torch.to_thread(torchaudio.load, file.file)
+    waveform, sr = await asyncio.to_thread(torchaudio.load, file.file)
     embedding = vpengine.embed(waveform, sr)
     reference = torch.from_numpy(user.voiceprint).to(device=vpengine.device)
 
@@ -147,6 +148,6 @@ async def verify_voice(
         subject=str(user.id),
         name=f"{user.name} {user.surname}",
         delta=timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES),
-        scopes=["full_access"],
+        scopes=["auth:full"],
     )
     return Token(access_token=token, expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60)
