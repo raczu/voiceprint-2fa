@@ -10,7 +10,7 @@ from fastapi.routing import APIRouter
 from fastapi.security import OAuth2PasswordRequestForm
 
 from app import crud
-from app.api.deps import CurrentEnrollmentUserDep, SessionDep, VPEngineDep
+from app.api.deps import Current2FAUserDep, CurrentEnrollmentUserDep, SessionDep, VPEngineDep
 from app.core import create_token, settings
 from app.schemas import Token, TokenWithPhrase, UserCreate
 
@@ -130,9 +130,7 @@ async def login(
     summary="Verify user's voice for authentication",
     response_model=Token,
 )
-async def verify_voice(
-    file: UploadFile, user: CurrentEnrollmentUserDep, vpengine: VPEngineDep
-) -> Token:
+async def verify_voice(file: UploadFile, user: Current2FAUserDep, vpengine: VPEngineDep) -> Token:
     waveform, sr = await asyncio.to_thread(torchaudio.load, file.file)
     embedding = vpengine.embed(waveform, sr)
     reference = torch.from_numpy(user.voiceprint).to(device=vpengine.device)
