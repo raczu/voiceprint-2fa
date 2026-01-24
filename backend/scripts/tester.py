@@ -105,28 +105,47 @@ class ResearchResult(BaseModel):
 class BatchResults(RootModel):
     root: list[ResearchResult]
 
-    def summary(self) -> None:
+    def summary(self, threshold: float = 0.7) -> None:
         if not self.root:
             logger.warning("No results to summarize")
             return
 
-        grouped = defaultdict(lambda: defaultdict(list))
+        grouped = defaultdict(list)
         for result in self.root:
-            grouped[result.scenario][result.type].append(result.score)
+            grouped[result.scenario].append(result)
 
         data = []
-        order = {"verification": 0, "imposter": 1, "sick": 2, "spoof": 3}
-        for scenario, tests in sorted(grouped.items()):
-            data.append([f"SCENARIO: {scenario}", "", ""])
-            for ttype in sorted(tests.keys(), key=lambda x: order.get(x, 999)):
-                scores = tests[ttype]
-                avg = np.mean(scores)
-                std = np.std(scores)
-                data.append([f"  > {ttype}", f"{avg:.4f}", f"{std:.4f}"])
+        logger.info("Summary of results (threshold: %.2f):", threshold)
+
+        for scenario, results in sorted(grouped.items()):
+            aut_scores = [r.score for r in results if r.type == "verification"]
+            imp_scores = [r.score for r in results if r.type == "imposter"]
+            sick_scores = [r.score for r in results if r.type == "sick"]
+            spoof_scores = [r.score for r in results if r.type == "spoof"]
+
+            data.append([f"SCENARIO: {scenario}", "", "", ""])
+
+            frr = np.mean([s < threshold for s in aut_scores])
+            avg_aut = np.mean(aut_scores)
+            data.append(["  > verification", f"{avg_aut:.4f}", f"{frr:.1%}", "FRR"])
+
+            far = np.mean([s >= threshold for s in imp_scores])
+            avg_imp = np.mean(imp_scores)
+            data.append(["  > imposter", f"{avg_imp:.4f}", f"{far:.1%}", "FAR"])
+
+            sick_acc = np.mean([s >= threshold for s in sick_scores])
+            avg_sick = np.mean(sick_scores)
+            data.append(["  > sick", f"{avg_sick:.4f}", f"{sick_acc:.1%}", "SICK ACCEPT RATE"])
+
+            spoof_acc = np.mean([s >= threshold for s in spoof_scores])
+            avg_spoof = np.mean(spoof_scores)
+            data.append(
+                ["  > spoofing", f"{avg_spoof:.4f}", f"{spoof_acc:.1%}", "SPOOFING ACCEPT RATE"]
+            )
 
         output = tabulate(
             data,
-            headers=["TEST TYPE / SCENARIO", "AVG SCORE", "STD DEV"],
+            headers=["SCENARIO / TEST TYPE", "AVG SCORE", "RATE [%]", "METRIC DESC"],
             tablefmt="fancy_grid",
             colalign=("left", "right", "right"),
         )
@@ -135,10 +154,9 @@ class BatchResults(RootModel):
 
 class VoiceprintResearch:
     _SCENARIOS: list[Scenario] = [
+        Scenario(name="S1_LONG_5", duration="long", enrollments=5),
         Scenario(name="S1_SHORT_5", duration="short", enrollments=5),
-        Scenario(name="S2_LONG_5", duration="long", enrollments=5),
-        Scenario(name="S3_SHORT_3", duration="short", enrollments=3),
-        Scenario(name="S4_LONG_3", duration="long", enrollments=3),
+        Scenario(name="S3_LONG_3", duration="long", enrollments=3),
     ]
     _ENR_ENDPOINT: str = "/api/v1/private/enroll"
     _VER_ENDPOINT: str = "/api/v1/private/verify"
@@ -244,7 +262,7 @@ class VoiceprintResearch:
         return f"{user.id}{scenario.name}".replace("-", "").replace("_", "")
 
     async def _enroll_phase(self, client: httpx.AsyncClient, scenario: Scenario) -> None:
-        logger.info("▶ PHASE 1: enrollment")
+        logger.info("> PHASE 1: enrollment")
         for user in self._users:
             uid = self._get_test_uid(user, scenario)
             files = user.recordings.filter(duration=scenario.duration, type="enrollment")[
@@ -259,7 +277,7 @@ class VoiceprintResearch:
     async def _test_phase(
         self, client: httpx.AsyncClient, scenario: Scenario
     ) -> list[ResearchResult]:
-        logger.info("▶ PHASE 2: testing")
+        logger.info("> PHASE 2: testing")
         results = []
         for user in self._users:
             uid = self._get_test_uid(user, scenario)
@@ -271,7 +289,7 @@ class VoiceprintResearch:
     async def run(self, client: httpx.AsyncClient) -> BatchResults:
         results = []
         for sc in self._SCENARIOS:
-            logger.info("▶ SCENARIO: %s", sc.name)
+            logger.info("> SCENARIO: %s", sc.name)
             await self._enroll_phase(client, sc)
             results.extend(await self._test_phase(client, sc))
         return BatchResults(root=results)
@@ -293,12 +311,18 @@ async def main() -> None:
         help="Base URL of the server to test against",
         default="http://localhost:8000",
     )
+    parser.add_argument(
+        "--threshold",
+        type=float,
+        help="Verification threshold for acceptance",
+        default=0.7,
+    )
     args = parser.parse_args()
 
     research = VoiceprintResearch(data=args.recordings)
     async with httpx.AsyncClient(base_url=args.server_url, timeout=60.0) as client:
         results = await research.run(client)
-        results.summary()
+        results.summary(args.threshold)
 
 
 if __name__ == "__main__":
