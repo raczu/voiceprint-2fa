@@ -61,7 +61,12 @@ class VoiceprintEngine:
             waveform = waveform.mean(dim=0, keepdim=True)
 
         embedding = self._recognizer.encode_batch(waveform)
-        return embedding.flatten()
+        embedding = embedding.flatten()
+        if settings.RECOGNIZER_MODEL == "xvect":
+            # Perform Instance Normalization for x-vector embeddings.
+            embedding = embedding - embedding.mean()
+            embedding = embedding / (embedding.std() + 1e-8)
+        return embedding
 
     def aggregate(self, embeddings: list[torch.Tensor]) -> torch.Tensor:
         """Aggregate multiple voiceprint embeddings into a single embedding."""
