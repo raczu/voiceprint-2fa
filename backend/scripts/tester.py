@@ -62,6 +62,15 @@ class UserRecordings(RootModel):
             if rec.metadata.duration == duration and rec.metadata.type == type
         ]
 
+    def get_verification_pool(self, duration: str) -> list[Path]:
+        pool = [
+            rec.file
+            for rec in self.root
+            if rec.metadata.duration == duration
+            and rec.metadata.type in ("enrollment", "verification")
+        ]
+        return sorted(set(pool))
+
     @classmethod
     def from_paths(cls, paths: list[Path]) -> Self:
         recordings = []
@@ -94,12 +103,12 @@ class UserGroup(BaseModel):
 
 class ResearchResult(BaseModel):
     user: str
+    probe: str
     scenario: str
     duration: str
     enrollments: int
     type: str
     score: float
-    repetition: int
 
 
 class BatchResults(RootModel):
@@ -150,6 +159,46 @@ class BatchResults(RootModel):
             colalign=("left", "right", "right"),
         )
         logger.info("\n%s", output)
+        logger.info("Total tests performed: %d", len(self.root))
+        self._similarity_matrix()
+
+    def _similarity_matrix(self):
+        logger.info("Similarity matrix (cross-score analysis):")
+        scenarios = {r.scenario for r in self.root}
+        for sc in sorted(scenarios):
+            results = [
+                r for r in self.root if r.scenario == sc and r.type in ("verification", "imposter")
+            ]
+
+            targets = sorted({r.user for r in results})
+            probes = sorted({r.probe.split("_")[0] for r in results})
+            tidx = {name: i for i, name in enumerate(targets)}
+            pidx = {name: i for i, name in enumerate(probes)}
+
+            n_rows, n_cols = len(targets), len(probes)
+            matrix_sums = np.zeros((n_rows, n_cols))
+            matrix_counts = np.zeros((n_rows, n_cols))
+            for result in results:
+                ridx = tidx[result.user]
+                cidx = pidx[result.probe.split("_")[0]]
+                matrix_sums[ridx, cidx] += result.score
+                matrix_counts[ridx, cidx] += 1
+
+            matrix_avgs = np.divide(
+                matrix_sums, matrix_counts, out=np.zeros_like(matrix_sums), where=matrix_counts != 0
+            )
+            data = []
+            for i, target in enumerate(targets):
+                row = [target.upper()]
+                for j in range(n_cols):
+                    value = f"{matrix_avgs[i, j]:.4f}" if matrix_counts[i, j] > 0 else "-"
+                    row.append(value)
+                data.append(row)
+
+            headers = ["TARGET / INPUT"] + [p.upper() for p in probes]
+            output = tabulate(data, headers=headers, tablefmt="fancy_grid")
+            logger.info("\n%s", output)
+            logger.info("Total comparisons: %d", len(results))
 
 
 class VoiceprintResearch:
@@ -160,9 +209,7 @@ class VoiceprintResearch:
     ]
     _ENR_ENDPOINT: str = "/api/v1/private/enroll"
     _VER_ENDPOINT: str = "/api/v1/private/verify"
-    _FIXED_TESTS: tuple[str, ...] = ("verification", "spoof", "sick")
-    _FIXED_TESTS_REPETITIONS: int = 10
-    _IMPOSTER_TEST_REPETITIONS: int = 10
+    _STATIC_TESTS: tuple[str, ...] = ("spoof", "sick")
 
     def __init__(self, data: Path) -> None:
         self._users = self._load_registry(data)
@@ -198,100 +245,101 @@ class VoiceprintResearch:
         response = await client.post(f"{self._ENR_ENDPOINT}/{uid}", files=payload)
         response.raise_for_status()
 
-    async def _run_fixed_tests(
-        self, client: httpx.AsyncClient, scenario: Scenario, user: UserGroup, uid: str
-    ) -> list[ResearchResult]:
-        results = []
-        for ttype in self._FIXED_TESTS:
-            files = user.recordings.filter(duration=scenario.duration, type=ttype)
-            if not files:
-                raise ValueError(
-                    f"No {ttype} recordings found for user {user.username} "
-                    f"with duration {scenario.duration}"
-                )
-
-            file = files[0]
-            for rep in range(1, self._FIXED_TESTS_REPETITIONS + 1):
-                score = await self._get_score(client, uid, file)
-                result = ResearchResult(
-                    user=user.username,
-                    scenario=scenario.name,
-                    duration=scenario.duration,
-                    enrollments=scenario.enrollments,
-                    type=ttype,
-                    score=score,
-                    repetition=rep,
-                )
-                results.append(result)
-        return results
-
-    async def _run_imposter_tests(
+    async def _run_dynamic_verification(
         self,
         client: httpx.AsyncClient,
         scenario: Scenario,
         user: UserGroup,
         uid: str,
+        files: list[Path],
+    ) -> list[ResearchResult]:
+        results = []
+        for file in files:
+            score = await self._get_score(client, uid, file)
+            results.append(
+                ResearchResult(
+                    user=user.username,
+                    probe=f"{user.username}_verification",
+                    scenario=scenario.name,
+                    duration=scenario.duration,
+                    enrollments=scenario.enrollments,
+                    type="verification",
+                    score=score,
+                )
+            )
+        return results
+
+    async def _run_static_tests(
+        self, client: httpx.AsyncClient, scenario: Scenario, user: UserGroup, uid: str
+    ) -> list[ResearchResult]:
+        results = []
+        for ttype in self._STATIC_TESTS:
+            files = user.recordings.filter(duration=scenario.duration, type=ttype)
+            for file in files:
+                score = await self._get_score(client, uid, file)
+                results.append(
+                    ResearchResult(
+                        user=user.username,
+                        probe=f"{user.username}_{ttype}",
+                        scenario=scenario.name,
+                        duration=scenario.duration,
+                        enrollments=scenario.enrollments,
+                        type=ttype,
+                        score=score,
+                    )
+                )
+        return results
+
+    async def _run_imposter_tests(
+        self, client: httpx.AsyncClient, scenario: Scenario, user: UserGroup, uid: str
     ) -> list[ResearchResult]:
         results = []
         others = [u for u in self._users if u.username != user.username]
-        for rep in range(1, self._IMPOSTER_TEST_REPETITIONS + 1):
-            imposter = np.random.choice(others)
-            files = imposter.recordings.filter(duration=scenario.duration, type="verification")
-            if not files:
-                raise ValueError(
-                    f"No verification recordings found for imposter user {imposter.username} "
-                    f"with duration {scenario.duration}"
+        for imposter in others:
+            files = imposter.recordings.get_verification_pool(scenario.duration)
+            for file in files:
+                score = await self._get_score(client, uid, file)
+                results.append(
+                    ResearchResult(
+                        user=user.username,
+                        probe=f"{imposter.username}_imposter",
+                        scenario=scenario.name,
+                        duration=scenario.duration,
+                        enrollments=scenario.enrollments,
+                        type="imposter",
+                        score=score,
+                    )
                 )
-
-            file = files[0]
-            score = await self._get_score(client, uid, file)
-            result = ResearchResult(
-                user=user.username,
-                scenario=scenario.name,
-                duration=scenario.duration,
-                enrollments=scenario.enrollments,
-                type="imposter",
-                score=score,
-                repetition=rep,
-            )
-            results.append(result)
-        return results
-
-    @staticmethod
-    def _get_test_uid(user: UserGroup, scenario: Scenario) -> str:
-        return f"{user.id}{scenario.name}".replace("-", "").replace("_", "")
-
-    async def _enroll_phase(self, client: httpx.AsyncClient, scenario: Scenario) -> None:
-        logger.info("> PHASE 1: enrollment")
-        for user in self._users:
-            uid = self._get_test_uid(user, scenario)
-            files = user.recordings.filter(duration=scenario.duration, type="enrollment")[
-                : scenario.enrollments
-            ]
-            if not files:
-                raise ValueError(f"No enrollment recordings found for user {user.username}")
-
-            logger.info("Enrolling user (%s)...", user.username)
-            await self._enroll_user(client, uid, files)
-
-    async def _test_phase(
-        self, client: httpx.AsyncClient, scenario: Scenario
-    ) -> list[ResearchResult]:
-        logger.info("> PHASE 2: testing")
-        results = []
-        for user in self._users:
-            uid = self._get_test_uid(user, scenario)
-            logger.info("Running all tests for user (%s)...", user.username)
-            results.extend(await self._run_fixed_tests(client, scenario, user, uid))
-            results.extend(await self._run_imposter_tests(client, scenario, user, uid))
         return results
 
     async def run(self, client: httpx.AsyncClient) -> BatchResults:
         results = []
         for sc in self._SCENARIOS:
-            logger.info("> SCENARIO: %s", sc.name)
-            await self._enroll_phase(client, sc)
-            results.extend(await self._test_phase(client, sc))
+            logger.info(
+                "> SCENARIO: %s (duration: %s, enrollments: %d)",
+                sc.name,
+                sc.duration,
+                sc.enrollments,
+            )
+            for user in self._users:
+                pool = user.recordings.get_verification_pool(sc.duration)
+                available = len(pool)
+                logger.info("Running rotation (for user: %s) on %d files", user.username, available)
+
+                for i in range(available):
+                    indices = [(i + j) % available for j in range(sc.enrollments)]
+                    uid = f"{user.id}_{sc.name}_fold{i}".replace("-", "")
+
+                    await self._enroll_user(client, uid, [pool[idx] for idx in indices])
+                    await asyncio.sleep(0.5)
+
+                    verfiles = [pool[idx] for idx in range(available) if idx not in indices]
+                    if verfiles:
+                        results.extend(
+                            await self._run_dynamic_verification(client, sc, user, uid, verfiles)
+                        )
+                    results.extend(await self._run_static_tests(client, sc, user, uid))
+                    results.extend(await self._run_imposter_tests(client, sc, user, uid))
         return BatchResults(root=results)
 
 
