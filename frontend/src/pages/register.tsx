@@ -12,7 +12,6 @@ import {
   CardTitle,
   CardDescription,
   CardContent,
-  CardFooter,
 } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel, FieldError, FieldDescription } from "@/components/ui/field";
 import { toast } from "sonner";

@@ -49,10 +49,10 @@ export const AudioRecorder = ({
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
 
-  const mediaRecorderRef = useRef<ExtendableRecorder | null>(null);
+  const mediaRecorderRef = useRef<InstanceType<typeof ExtendableRecorder> | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -92,9 +92,7 @@ export const AudioRecorder = ({
 
         setRecordedBlob(blob);
         setAudioUrl(url);
-        setDuration((prev) => {
-          return currentTime;
-        });
+        setDuration(currentTime);
 
         setIsRecording(false);
         onStop?.();
