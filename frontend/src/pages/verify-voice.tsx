@@ -10,7 +10,6 @@ import { Info, Loader2 } from "lucide-react";
 import type { Recording } from "@/types/recording";
 import { ModeToggle } from "@/components/mode-toggle";
 import type { AxiosError } from "axios";
-import { useNavigate } from "react-router-dom";
 
 export const VerifyVoicePage = () => {
   const { verifyVoice, phrase, logout } = useAuth();
@@ -19,7 +18,6 @@ export const VerifyVoicePage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const navigate = useNavigate();
 
   const handleSaveRecording = useCallback(
     (blob: Blob, _originalName: string, duration: number) => {
