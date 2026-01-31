@@ -9,8 +9,9 @@ import { toast } from "sonner";
 import { Loader2, Info } from "lucide-react";
 import type { Recording } from "@/types/recording";
 import { ModeToggle } from "@/components/mode-toggle";
+import type { AxiosError } from "axios";
 
-const MIN_RECORDINGS = 3;
+const MIN_RECORDINGS = 5;
 
 export const EnrollVoicePage = () => {
   const { enrollVoice, phrase, logout } = useAuth();
@@ -61,9 +62,16 @@ export const EnrollVoicePage = () => {
 
       await enrollVoice(files);
       toast.success("Profil głosowy został utworzony.");
-    } catch (error) {
-      console.error(error);
-      toast.error("Wystąpił błąd podczas wysyłania.");
+    } catch (err) {
+      const error = err as AxiosError<{ message: string }>;
+      const status = error.response?.status;
+      if (status === 403) {
+        toast.error("Czas oczekiwania na rejestrrację profilu głosowego minął!", {
+          description: "Zostaniesz przekierowany do ekranu logowania",
+          duration: 4000,
+        });
+        logout();
+      }
     } finally {
       setIsSubmitting(false);
     }

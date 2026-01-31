@@ -4,7 +4,8 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, EmailStr, field_validator
 
-PASSWORD_RE = re.compile(r"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$")
+PASSWORD_RE = re.compile(r"^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{12,}$")
+USERNAME_RE = re.compile(r"^\w{4,}$")
 
 
 class VerifyResponse(BaseModel):
@@ -44,7 +45,17 @@ class UserCreate(UserBase):
         if not PASSWORD_RE.match(v):
             raise ValueError(
                 "Password must be at least 8 characters long and include at least one uppercase letter, "
-                "one lowercase letter, one digit, and one special character."
+                "one lowercase letter, one digit, and one special character"
+            )
+        return v
+
+    @field_validator("username", mode="after")
+    @classmethod
+    def _validate_username(cls, v: str) -> str:
+        if not USERNAME_RE.match(v):
+            raise ValueError(
+                "Username must be at least 4 characters long and contain only alphanumeric characters "
+                "and underscores"
             )
         return v
 

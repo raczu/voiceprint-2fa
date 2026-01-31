@@ -2,10 +2,10 @@ import { z } from "zod";
 
 const USERNAME_REGEX = /^\w{4,}$/;
 
-const PASSWORD_REGEX = /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{8,}$/;
+const PASSWORD_REGEX = /^(?=.*?[A-Z])(?=.*?[a-z])(?=.*?[0-9])(?=.*?[#?!@$%^&*-]).{12,}$/;
 
 export const loginSchema = z.object({
-  email: z.email(),
+  email: z.email("Nieprawidłowy format adresu email"),
   password: z.string(),
 });
 
@@ -17,7 +17,7 @@ export const registerSchema = z
       message: "Login musi mieć min. 4 znaki i zawierać tylko litery, cyfry lub _",
     }),
     email: z.email("Nieprawidłowy format adresu email"),
-    password: z.string().min(8, "Hasło musi mieć min. 8 znaków").regex(PASSWORD_REGEX, {
+    password: z.string().min(12, "Hasło musi mieć min. 12 znaków").regex(PASSWORD_REGEX, {
       message:
         "Hasło musi zawierać przynajmniej: dużą i małą literę, cyfrę oraz znak specjalny (#?!@$%^&*-)",
     }),

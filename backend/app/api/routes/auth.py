@@ -135,8 +135,8 @@ async def verify_voice(file: UploadFile, user: Current2FAUserDep, vpengine: VPEn
     embedding = vpengine.embed(waveform, sr)
     reference = torch.from_numpy(user.voiceprint).to(device=vpengine.device)
 
-    score = vpengine.verify(embedding, reference)
-    if score < settings.VOICE_VERIFICATION_THRESHOLD:
+    success, _ = vpengine.verify(embedding, reference)
+    if not success:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Voice verification failed",

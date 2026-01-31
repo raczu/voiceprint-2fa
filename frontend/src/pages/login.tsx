@@ -3,13 +3,13 @@ import { useAuth } from "@/context/auth-provider";
 import { Link } from "react-router-dom";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AxiosError } from "axios";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Field, FieldGroup, FieldLabel, FieldError, FieldDescription } from "@/components/ui/field";
 import { Loader2 } from "lucide-react";
-import { toast } from "sonner";
 
 import { loginSchema, type LoginCredentials } from "@/schemas/auth";
 import { ModeToggle } from "@/components/mode-toggle";
@@ -21,6 +21,7 @@ export const LoginPage = () => {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors },
   } = useForm<LoginCredentials>({
     resolver: zodResolver(loginSchema),
@@ -34,9 +35,17 @@ export const LoginPage = () => {
     setIsLoading(true);
     try {
       await login(credentials);
-    } catch (error) {
-      console.error(error);
-      toast.error("Nieprawidłowy email lub hasło.");
+    } catch (err) {
+      const error = err as AxiosError<{ message: string }>;
+      const status = error.response?.status;
+      if (status === 401) {
+        setError("root", { type: "manual", message: "Nieprawidłowy email lub hasło" });
+      } else if (status === 403) {
+        setError("root", {
+          type: "manual",
+          message: "Profil głosowy nie został jeszcze utworzony",
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -83,6 +92,8 @@ export const LoginPage = () => {
               </Field>
 
               <Field>
+                {errors.root && <FieldError>{errors.root.message}</FieldError>}
+
                 <Button className="w-full" type="submit" disabled={isLoading}>
                   {isLoading ? (
                     <>

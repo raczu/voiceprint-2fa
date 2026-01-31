@@ -3,6 +3,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "react-router-dom";
 import { useAuth } from "@/context/auth-provider";
 import { registerSchema, type RegisterFormValues } from "@/schemas/auth";
+import { AxiosError } from "axios";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +19,7 @@ export const RegisterPage = () => {
   const {
     register,
     handleSubmit,
+    setError,
     formState: { errors, isSubmitting },
   } = useForm<RegisterFormValues>({
     resolver: zodResolver(registerSchema),
@@ -35,11 +37,15 @@ export const RegisterPage = () => {
     try {
       await registerUser(data);
       toast.success("Konto utworzone pomyślnie!", {
-        description: "Przygotuj się do nagrania próbki głosu.",
+        description: "Przygotuj się do nagrania próbki głosu",
         duration: 4000,
       });
-    } catch (error) {
-      console.error(error);
+    } catch (err) {
+      const error = err as AxiosError<{ message: string }>;
+      const status = error.response?.status;
+      if (status === 400) {
+        setError("root", { type: "manual", message: "Użytkownik o podanym emailu już istnieje" });
+      }
     }
   };
 
@@ -90,7 +96,7 @@ export const RegisterPage = () => {
                 <FieldLabel htmlFor="password">Hasło</FieldLabel>
                 <Input {...register("password")} type="password" id="password" required />
                 <FieldDescription>
-                  Min. 8 znaków, w tym wielka litera, cyfra i znak specjalny.
+                  Min. 12 znaków, w tym wielka litera, cyfra i znak specjalny.
                 </FieldDescription>
                 {errors.password && <FieldError>{errors.password.message}</FieldError>}
               </Field>
@@ -110,6 +116,8 @@ export const RegisterPage = () => {
               </Field>
 
               <Field>
+                {errors.root && <FieldError>{errors.root.message}</FieldError>}
+
                 <Button type="submit" className="w-full mt-4" disabled={isSubmitting}>
                   {isSubmitting ? (
                     <>

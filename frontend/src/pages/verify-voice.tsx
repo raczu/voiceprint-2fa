@@ -2,19 +2,24 @@ import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "@/context/auth-provider";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { Field, FieldLabel, FieldGroup } from "@/components/ui/field";
+import { Field, FieldLabel, FieldGroup, FieldError } from "@/components/ui/field";
 import { AudioRecorder } from "@/components/audio-recorder";
 import { RecordingsList } from "@/components/recordings-list";
 import { toast } from "sonner";
 import { Info, Loader2 } from "lucide-react";
 import type { Recording } from "@/types/recording";
 import { ModeToggle } from "@/components/mode-toggle";
+import type { AxiosError } from "axios";
+import { useNavigate } from "react-router-dom";
 
 export const VerifyVoicePage = () => {
   const { verifyVoice, phrase, logout } = useAuth();
 
   const [recording, setRecording] = useState<Recording | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const navigate = useNavigate();
 
   const handleSaveRecording = useCallback(
     (blob: Blob, _originalName: string, duration: number) => {
@@ -32,6 +37,7 @@ export const VerifyVoicePage = () => {
       };
 
       setRecording(newRecording);
+      setErrorMessage(null);
     },
     [recording],
   );
@@ -40,6 +46,7 @@ export const VerifyVoicePage = () => {
     if (recording) {
       URL.revokeObjectURL(recording.url);
       setRecording(null);
+      setErrorMessage(null);
     }
   }, [recording]);
 
@@ -56,10 +63,19 @@ export const VerifyVoicePage = () => {
     try {
       const file = new File([recording.blob], "verify.wav", { type: "audio/wav" });
       await verifyVoice(file);
-      toast.success("Tożsamość została potwierdzona.");
-    } catch (error: any) {
-      console.error(error);
-      toast.error("Weryfikacja nie powiodła się. Spróbuj ponownie.");
+      toast.success("Tożsamość została potwierdzona");
+    } catch (err) {
+      const error = err as AxiosError<{ message: string }>;
+      const status = error.response?.status;
+      if (status == 401) {
+        setErrorMessage("Weryfikacja nie powiodła się");
+      } else if (status == 403) {
+        toast.error("Czas oczekiwania na weryfikację minął!", {
+          description: "Zostaniesz przekierowany do ekranu logowania",
+          duration: 4000,
+        });
+        logout();
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -138,6 +154,8 @@ export const VerifyVoicePage = () => {
               </div>
 
               <Field>
+                {errorMessage && <FieldError>{errorMessage}</FieldError>}
+
                 <Button className="w-full" type="submit" disabled={!recording || isSubmitting}>
                   {isSubmitting ? (
                     <>
