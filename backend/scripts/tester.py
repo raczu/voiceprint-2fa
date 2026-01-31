@@ -161,8 +161,9 @@ class BatchResults(RootModel):
         logger.info("\n%s", output)
         logger.info("Total tests performed: %d", len(self.root))
         self._similarity_matrix()
+        self._imposter_stats_matrix()
 
-    def _similarity_matrix(self):
+    def _similarity_matrix(self) -> None:
         logger.info("Similarity matrix (cross-score analysis):")
         scenarios = {r.scenario for r in self.root}
         for sc in sorted(scenarios):
@@ -196,6 +197,36 @@ class BatchResults(RootModel):
                 data.append(row)
 
             headers = ["TARGET / INPUT"] + [p.upper() for p in probes]
+            output = tabulate(data, headers=headers, tablefmt="fancy_grid")
+            logger.info("\n%s", output)
+            logger.info("Total comparisons: %d", len(results))
+
+    def _imposter_stats_matrix(self) -> None:
+        logger.info("Imposter min/max matrix (score range analysis):")
+        scenarios = {r.scenario for r in self.root}
+        for sc in scenarios:
+            results = [r for r in self.root if r.scenario == sc and r.type == "imposter"]
+
+            targets = sorted({r.user for r in results})
+            probes = sorted({r.probe.split("_")[0] for r in results})
+
+            mapping = defaultdict(lambda: defaultdict(list))
+            for result in results:
+                probe = result.probe.split("_")[0]
+                mapping[result.user][probe].append(result.score)
+
+            data = []
+            for target in targets:
+                row = [target.upper()]
+                for probe in probes:
+                    if target == probe:
+                        row.append("-")
+                        continue
+                    scores = mapping[target][probe]
+                    row.append(f"{min(scores):.4f} / {max(scores):.4f}")
+                data.append(row)
+
+            headers = ["TARGET / INPUT (MIN/MAX)"] + [p.upper() for p in probes]
             output = tabulate(data, headers=headers, tablefmt="fancy_grid")
             logger.info("\n%s", output)
             logger.info("Total comparisons: %d", len(results))
